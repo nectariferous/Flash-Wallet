@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoFlash Pro - Ultimate Trading Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.7.1/dist/umd/index.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f39c12;
+            --background-dark: #1a1a2e;
+            --background-light: #16213e;
+            --text-color: #e94560;
+            --success-color: #4caf50;
+            --danger-color: #f44336;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-dark);
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .navbar {
+            background-color: var(--background-light);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sidebar {
+            background-color: var(--background-light);
+            height: calc(100vh - 56px);
+            position: fixed;
+            top: 56px;
+            left: 0;
+            width: 250px;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all 0.3s;
+            flex-grow: 1;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        .card {
+            background-color: var(--background-light);
+            border: none;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-secondary {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        .token-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .token-list .list-group-item {
+            background-color: var(--background-light);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        .animated-bg {
+            background: linear-gradient(270deg, #4a90e2, #f39c12, #e94560);
+            background-size: 600% 600%;
+            animation: gradientBG 15s ease infinite;
+        }
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        #walletOptions {
+            display: none;
+            position: absolute;
+            background-color: var(--background-light);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 1000;
+        }
+        #walletOptions button {
+            display: block;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <button class="navbar-toggler" type="button" id="sidebarToggle">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand" href="#"><i class="fas fa-bolt text-warning"></i> CryptoFlash Pro</a>
+            <div class="position-relative">
+                <button id="connectWalletButton" class="btn btn-outline-light"><i class="fas fa-wallet"></i> Connect Wallet</button>
+                <div id="walletOptions">
+                    <button class="btn btn-secondary btn-sm" onclick="connectWallet('metamask')">MetaMask</button>
+                    <button class="btn btn-secondary btn-sm" onclick="connectWallet('walletconnect')">WalletConnect</button>
+                    <button class="btn btn-secondary btn-sm" onclick="connectWallet('trustwallet')">Trust Wallet</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="d-flex">
+        <aside class="sidebar p-3" id="sidebar">
+            <div class="card mb-3 fade-in">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-user-circle"></i> Account Info</h5>
+                    <p id="accountAddress" class="card-text">Not connected</p>
+                    <p id="accountBalance" class="card-text">Balance: 0 ETH</p>
+                    <button id="refreshBalanceButton" class="btn btn-primary btn-sm"><i class="fas fa-sync-alt"></i> Refresh</button>
+                </div>
+            </div>
+            <div class="card fade-in">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-list"></i> Token List</h5>
+                    <ul class="list-group token-list" id="tokenList">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ETH
+                            <span class="badge bg-primary rounded-pill">1.2345</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            USDT
+                            <span class="badge bg-primary rounded-pill">1000.00</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            USDC
+                            <span class="badge bg-primary rounded-pill">500.00</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card fade-in">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-exchange-alt"></i> Quick Trade</h5>
+                            <div class="mb-3">
+                                <label for="tradeAmount" class="form-label">Amount</label>
+                                <input type="number" class="form-control" id="tradeAmount" placeholder="Enter amount">
+                            </div>
+                            <div class="mb-3">
+                                <label for="tokenSelect" class="form-label">Select Token</label>
+                                <select id="tokenSelect" class="form-select">
+                                    <option value="ETH">ETH</option>
+                                    <option value="USDT">USDT</option>
+                                    <option value="USDC">USDC</option>
+                                </select>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button id="buyButton" class="btn btn-success"><i class="fas fa-arrow-up"></i> Buy</button>
+                                <button id="sellButton" class="btn btn-danger"><i class="fas fa-arrow-down"></i> Sell</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card fade-in">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-bolt"></i> Flash Swap</h5>
+                            <p class="card-text">Execute a flash swap for instant liquidity.</p>
+                            <button id="flashSwapButton" class="btn btn-warning"><i class="fas fa-bolt"></i> Execute Flash Swap</button>
+                        </div>
+                    </div>
+                    <div class="card mt-3 fade-in animated-bg">
+                        <div class="card-body">
+                            <h5 class="card-title"><i class="fas fa-chart-line"></i> Market Trends</h5>
+                            <div id="marketChart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="alert alert-info mt-3 fade-in" role="alert" id="message"></div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        let web3;
+        let userAccount;
+
+        document.getElementById('connectWalletButton').addEventListener('click', showWalletOptions);
+        document.getElementById('refreshBalanceButton').addEventListener('click', refreshBalance);
+        document.getElementById('buyButton').addEventListener('click', () => trade('buy'));
+        document.getElementById('sellButton').addEventListener('click', () => trade('sell'));
+        document.getElementById('flashSwapButton').addEventListener('click', executeFlashSwap);
+        document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
+        function showWalletOptions() {
+            const options = document.getElementById('walletOptions');
+            options.style.display = options.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function connectWallet(walletType) {
+            let provider;
+
+            switch(walletType) {
+                case 'metamask':
+                    if (typeof window.ethereum !== 'undefined') {
+                        provider = window.ethereum;
+                    } else {
+                        showMessage('MetaMask not detected. Please install MetaMask or try another wallet option.', 'warning');
+                        return;
+                    }
+                    break;
+                case 'walletconnect':
+                    provider = new WalletConnectProvider.default({
+                        infuraId: "YOUR_INFURA_ID_HERE" // Replace with your Infura ID
+                    });
+                    await provider.enable();
+                    break;
+                case 'trustwallet':
+                    if (typeof window.ethereum !== 'undefined') {
+                        provider = window.ethereum;
+                    } else {
+                        showMessage('Trust Wallet not detected. Please install Trust Wallet or try another option.', 'warning');
+                        return;
+                    }
+                    break;
+                default:
+                    showMessage('Unknown wallet type', 'danger');
+                    return;
+            }
+
+            try {
+                web3 = new Web3(provider);
+                const accounts = await web3.eth.requestAccounts();
+                userAccount = accounts[0];
+                document.getElementById('accountAddress').innerText = `${userAccount.substring(0, 6)}...${userAccount.substring(38)}`;
+                refreshBalance();
+                document.getElementById('connectWalletButton').innerHTML = '<i class="fas fa-check-circle"></i> Connected';
+                document.getElementById('connectWalletButton').classList.remove('btn-outline-light');
+                document.getElementById('connectWalletButton').classList.add('btn-success');
+                document.getElementById('walletOptions').style.display = 'none';
+            } catch (error) {
+                showMessage(`Error connecting wallet: ${error.message}`, 'danger');
+            }
+        }
+
+        async function refreshBalance() {
+            if (!userAccount) return;
+            try {
+                const balance = await web3.eth.getBalance(userAccount);
+                const balanceInEther = web3.utils.fromWei(balance, 'ether');
+                document.getElementById('accountBalance').innerText = `Balance: ${parseFloat(balanceInEther).toFixed(4)} ETH`;
+            } catch (error) {
+                showMessage(`Error fetching balance: ${error.message}`, 'danger');
+            }
+        }
+
+        function trade(action) {
+            const amount = document.getElementById('tradeAmount').value;
+            const token = document.getElementById('tokenSelect').value;
+            showMessage(`${action.toUpperCase()} ${amount} ${token} - This is a simulated trade.`, 'success');
+        }
+
+        async function executeFlashSwap() {
+            if (!userAccount) {
+                showMessage('Please connect your wallet first.', 'warning');
+                return;
+            }
+            showMessage('Executing flash swap... This is a simulated action.', 'info');
+        }
+
+        function showMessage(message, type = 'info') {
+            const alertElement = document.getElementById('message');
+            alertElement.innerText = message;
+            alertElement.className = `alert alert-${type} mt-3 fade-in`;
+        }
+
+        // Sample market chart
+        var options = {
+            series: [{
+                name: "ETH Price",
+                data: [1800, 1850, 1820, 1880, 1900, 1850, 1830]
+            }],
+            chart: {
+                type: 'line',
+                height: 300,
+                foreColor: '#ffffff',
+                toolbar: {
+                    show: false
+                }
+            },
+            stroke: {
+                curve: 'smooth'
+            },
+            xaxis: {
+                categories: ['1 Day', '2 Days', '3 Days', '4 Days', '5 Days', '6 Days', '7 Days'],
+            },
+            tooltip: {
+                theme: 'dark'
+            }
+        };
+
+      var chart = new ApexCharts(document.querySelector("#marketChart"), options);
+      chart.render();
+
+      // Function to update chart data (simulated for demonstration)
+      function updateChartData() {
+          const newData = [1830, 1860, 1840, 1890, 1920, 1870, 1850].map(price => price + Math.random() * 50 - 25);
+          chart.updateSeries([{
+              data: newData
+          }]);
+      }
+
+      // Update chart data every 5 seconds (for demonstration purposes)
+      setInterval(updateChartData, 5000);
+
+      </script>
+      </body>
+      </html>
